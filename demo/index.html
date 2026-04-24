@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeskCaptcha — Integration Example</title>
+  <style>
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      padding: 40px;
+      max-width: 400px;
+    }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid gray;
+      outline: none;
+    }
+
+    .captcha-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 6px 0 10px;
+    }
+
+    .captcha-row img {
+      flex: 1;
+      height: 80px;
+      border: 1px solid gray;
+      object-fit: contain;
+      background: #ffffff
+    }
+
+    .btn {
+      padding: 10px 14px;
+      background: gray;
+      color: white;
+      cursor: pointer;
+    }
+
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-full { width: 100%; margin-top: 8px; }
+
+    .msg { margin-top: 20px; min-height: 20px; font-size: 16px; text-align: center; }
+    .ok  { color: green; }
+    .err { color: red; }
+
+    @media (max-width: 480px) { .card { padding: 28px 20px; } }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <hgroup align="center" style="margin-bottom:24px">
+    <h2>DeskCaptcha</h2>
+    <p><small>Versão de Teste</small></p>
+  </hgroup>
+
+  <form id="form">
+    <div class="field">
+      <label for="email"><small>E-mail</small></label><br>
+      <input type="email" id="email" placeholder="voce@exemplo.com" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="password"><small>Senha</small></label><br>
+      <input type="password" id="password" placeholder="••••••••">
+    </div>
+
+    <div class="field">
+      <label><small>Verificação de segurança</small></label>
+      <div class="captcha-row">
+        <img id="captcha-img" alt="captcha" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
+      </div>
+      <input type="text" id="answer" placeholder="Digite os caracteres acima"
+             autocomplete="off" maxlength="8" oninput="this.value=this.value.toUpperCase()">
+    </div>
+
+    <button type="button" id="btn-refresh" class="btn btn-full">Atualizar captcha</button>
+    <input type="submit" id="btn-submit" class="btn btn-full" value="Entrar">
+    <p class="msg" id="msg"></p>
+  </form>
+
+</div>
+
+<p align="center" style="margin-top:20px">
+  <small>Protegido por <a href="https://desknect.com">DeskCaptcha</a> &mdash; <a href="https://github.com/desknect/deskcaptcha">Open Source</a></small>
+</p>
+
+<script>
+  /**
+   * DeskCaptcha — Exemplo de Integração
+   * -------------------------------------
+   * 1. Defina API com a URL do seu servidor DeskCaptcha.
+   * 2. Chame load() ao abrir a página para exibir o captcha.
+   * 3. No submit, chame /validate com token + answer.
+   * 4. Sempre valide no backend antes de processar o formulário.
+   *
+   * Desknect.com       — https://desknect.com
+   * Documentação       — https://dcaptcha.desknect.com/api-documentacao
+   * Donate             — https://desknect.com/donate
+   * GitHub             — https://github.com/desknect/deskcaptcha
+   */
+
+  const API = 'http://localhost/deskcaptcha/public/index.php/v1';
+
+  let token = '';
+  let busy  = false;
+
+  const img        = document.getElementById('captcha-img');
+  const answer     = document.getElementById('answer');
+  const msg        = document.getElementById('msg');
+  const btnSubmit  = document.getElementById('btn-submit');
+  const btnRefresh = document.getElementById('btn-refresh');
+
+  async function load() {
+    if (busy) return;
+    busy = true;
+    btnRefresh.disabled = true;
+    btnSubmit.disabled  = true;
+    answer.value = '';
+    msg.textContent = '';
+    msg.className = 'msg';
+
+    try {
+      const res  = await fetch(`${API}/captcha/generate?scale=1&chars=4`);
+      const json = await res.json();
+
+      if (!json.success) {
+        const wait = json.meta?.rate_limit?.retry_after;
+        showMsg(wait ? `Muitas requisições. Tente novamente em ${wait}s.` : 'Não foi possível carregar o captcha.', 'err');
+        return;
+      }
+
+      token = json.data.token;
+
+      await new Promise(resolve => {
+        img.onload  = resolve;
+        img.onerror = resolve;
+        img.src = json.data.image_url + '?t=' + Date.now();
+      });
+
+    } catch {
+      showMsg('Não foi possível conectar ao servidor.', 'err');
+    } finally {
+      busy = false;
+      btnRefresh.disabled = false;
+      btnSubmit.disabled  = false;
+    }
+  }
+
+  document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (busy) return;
+
+    const value = answer.value.trim();
+    if (!value) { showMsg('Digite os caracteres exibidos.', 'err'); return; }
+    if (!token) { showMsg('Captcha não carregado.', 'err'); return; }
+
+    busy = true;
+    btnSubmit.disabled = true;
+    showMsg('Verificando...', '');
+
+    try {
+      const res  = await fetch(`${API}/captcha/validate`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ token, answer: value }),
+      });
+      const json = await res.json();
+
+      if (json.data?.valid) {
+        showMsg('✓ Verificado! Entrando...', 'ok');
+        // TODO: submit your actual form here
+      } else {
+        showMsg('✗ Caracteres incorretos. Tente novamente.', 'err');
+        busy = false;
+        load();
+      }
+    } catch {
+      showMsg('Falha na validação. Verifique sua conexão.', 'err');
+      busy = false;
+      btnSubmit.disabled = false;
+    }
+  });
+
+  function showMsg(text, type) {
+    msg.textContent = text;
+    msg.className   = 'msg' + (type ? ' ' + type : '');
+  }
+
+  btnRefresh.addEventListener('click', load);
+  load();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+# SQLite databases (generated at runtime)
+database/*.sqlite
+
+# Generated captcha images
+storage/captchas/
+
+# Runtime files
+storage/last_rotation_check.txt
+storage/logs/
+
+# Local config overrides
+config/local.php
+.env
+
+# Claude Code internal
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Legacy
+result/
+data/captchas.json

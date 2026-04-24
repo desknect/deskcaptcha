@@ -1,0 +1,10 @@
+Options -Indexes
+RewriteEngine On
+
+# Block direct access to sensitive directories
+RewriteRule ^(database|storage|config|src|data)/ - [F,L]
+
+# Route all requests through index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]

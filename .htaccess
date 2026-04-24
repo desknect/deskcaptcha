@@ -1,0 +1,5 @@
+Options -Indexes
+
+# Block direct access to all internal files
+RewriteEngine On
+RewriteRule ^(?!public/|demo/)(.*)$ - [F,L]
